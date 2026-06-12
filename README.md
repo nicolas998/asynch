@@ -92,6 +92,77 @@ If you want a custom location, you can use the `--prefix` option when running co
 ../configure CFLAGS="-O3 -DNDEBUG -Wno-format-security" --prefix=/custom/location/
 ```
 
+## Windows (native, without Docker/WSL)
+
+Asynch can be compiled natively on Windows using the [MSYS2](https://www.msys2.org/) MinGW-w64 toolchain and Microsoft MPI.
+
+### 1. Install MSYS2 and the MS-MPI runtime
+
+From PowerShell or cmd:
+
+```powershell
+winget install MSYS2.MSYS2
+winget install Microsoft.msmpi
+```
+
+MS-MPI provides `mpiexec.exe` and the `msmpi.dll` runtime (installed under `C:\Program Files\Microsoft MPI\`).
+
+### 2. Install the build dependencies
+
+Open an **MSYS2 MINGW64** shell (`mingw64.exe` in the MSYS2 install directory) and run:
+
+```shell
+pacman -S --needed autoconf automake autoconf-archive libtool make \
+    mingw-w64-x86_64-gcc \
+    mingw-w64-x86_64-zlib \
+    mingw-w64-x86_64-hdf5 \
+    mingw-w64-x86_64-msmpi \
+    mingw-w64-x86_64-pkgconf
+```
+
+The `mingw-w64-x86_64-msmpi` package provides the MPI headers, the `libmsmpi` import library and an `mpicc` wrapper that link against the MS-MPI runtime installed in step 1.
+
+### 3. Fix the `h5cc` wrapper if needed (MSYS2 packaging bug)
+
+Some builds of the MSYS2 HDF5 package hardcode the compiler path of the machine that built the package inside the `h5cc` script, which breaks HDF5 detection during `configure`. Check for it and fix it with:
+
+```shell
+grep "D:/M" /mingw64/bin/h5cc && sed -i 's|D:/M/msys64/mingw64/bin/gcc.exe|gcc|g' /mingw64/bin/h5cc
+```
+
+If `grep` prints nothing, your package is fine and there is nothing to fix.
+
+### 4. Compile
+
+Still in the MINGW64 shell, from the repository root:
+
+```shell
+autoreconf --install
+cd build
+../configure CFLAGS="-O3 -DNDEBUG -Wno-format-security" --with-postgresql=no
+make
+```
+
+This produces `build/src/asynch.exe` and `build/src/libasynch.a`. PostgreSQL support is disabled (`libpq` is not packaged for MinGW in a way `configure` detects); METIS, PETSc and external BLAS are optional and simply skipped if absent.
+
+### 5. Run
+
+From the MINGW64 shell (which already has the HDF5/zlib DLLs on `PATH`):
+
+```shell
+cd examples
+"/c/Program Files/Microsoft MPI/Bin/mpiexec.exe" -n 4 ../build/src/asynch.exe clearcreek.gbl
+```
+
+Or from any Windows terminal (PowerShell/cmd), use the provided launcher, which sets up `PATH` for the MinGW DLLs and MS-MPI automatically:
+
+```powershell
+cd examples
+..\run-asynch.cmd -n 4 clearcreek.gbl
+```
+
+The expected output is the same as in **Running Example** below.
+
 ## Docker
 
 ### Note/Disclaimer

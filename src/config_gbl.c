@@ -25,7 +25,7 @@
 #include <models/definitions.h>
 
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #   define timegm _mkgmtime
 #endif
 
